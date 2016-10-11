@@ -615,9 +615,9 @@ def value_to_seq(value):
         a list of NumPy arrays
     '''
 
-    np_data = value.data().to_numpy()         
+    np_data = np.asarray(value)
     if value.mask():
-        mask = value.mask().to_numpy()
+        mask = np.asarray(value.mask())
         np_data = [seq[mask[idx] == 1] for idx, seq in enumerate(np_data)]
 
     return np_data
