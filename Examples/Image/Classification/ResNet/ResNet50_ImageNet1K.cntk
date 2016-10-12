@@ -4,7 +4,7 @@ command = TrainNetwork:BNStatistics:Eval
 
 precision = "float"; traceLevel = 1 ; deviceId = "auto"
 
-rootDir = "." ; configDir = "$RootDir$" ; dataDir = "C:\\Data\\Data\\ImageNet_2012_CNTK"; #dataDir = "$RootDir$" ;
+rootDir = "." ; configDir = "$RootDir$" ; dataDir = "$RootDir$" ;
 outputDir = "$rootDir$/Output" ;
 
 modelPath = "$outputDir$/Models/ResNet_50"
@@ -86,7 +86,7 @@ TrainNetwork = {
         gradUpdateType = "None"
         L2RegWeight = 0.0001
         dropoutRate = 0
-        numMBsToShowResult = 1
+        numMBsToShowResult = 500
 
         disableWkInBatchNormal = true
 
