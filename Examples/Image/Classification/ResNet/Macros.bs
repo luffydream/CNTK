@@ -74,7 +74,7 @@ ResNetBottleneckInc {outChannels, interOutChannels, stride1x1, stride3x3, bnTime
 
         # Shortcut
         stride = stride1x1.*stride3x3
-        s = ConvBNReLULayer {outChannels, (1:1), stride, bnTimeConst} (x)
+        s = ConvBNLayer {outChannels, (1:1), stride, bnTimeConst} (x)
 
         p = Plus(b, s)
         r = ReLU(p)
