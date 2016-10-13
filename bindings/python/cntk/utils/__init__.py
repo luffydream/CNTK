@@ -10,6 +10,7 @@ import collections
 import numpy as np
 import scipy.sparse
 from cntk import cntk_py
+from cntk.device import DeviceDescriptor
 from .persist import *
 
 
@@ -44,9 +45,9 @@ def cntk_device(device_id):
         CNTK DeviceDescriptor
     '''
     if device_id == -1:
-        return cntk_py.DeviceDescriptor.cpu_device()
+        return DeviceDescriptor.cpu_device()
     else:
-        return cntk_py.DeviceDescriptor.gpu_device(device_id)
+        return DeviceDescriptor.gpu_device(device_id)
 
 
 def is_string(value):
@@ -498,7 +499,7 @@ def ones_like(batch, precision):
 def create_NDArrayView(shape, data_type=cntk_py.DataType_Float, dev=None):
     shape = sanitize_shape(shape)
     if not dev:
-        dev = cntk_py.DeviceDescriptor.use_default_device()
+        dev = DeviceDescriptor.use_default_device()
     # FIXME only dense supported so far
     view = cntk_py.NDArrayView(
         data_type, cntk_py.StorageFormat_Dense, shape, dev)
@@ -507,7 +508,7 @@ def create_NDArrayView(shape, data_type=cntk_py.DataType_Float, dev=None):
 
 def create_NDArrayView_from_NumPy(nd, dev=None):
     if not dev:
-        dev = cntk_py.DeviceDescriptor.use_default_device()
+        dev = DeviceDescriptor.use_default_device()
 
     return cntk_py.NDArrayView(nd, dev, False)
 

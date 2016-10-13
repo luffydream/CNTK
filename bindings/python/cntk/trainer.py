@@ -4,7 +4,7 @@
 # ==============================================================================
 
 from . import cntk_py
-from .cntk_py import DeviceDescriptor
+from .device import DeviceDescriptor
 from .utils import sanitize_var_map, sanitize_function, typemap
 
 class Trainer(cntk_py.Trainer):

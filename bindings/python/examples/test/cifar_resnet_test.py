@@ -6,7 +6,7 @@
 
 import numpy as np
 import os
-from cntk import DeviceDescriptor
+from cntk.device import DeviceDescriptor
 from cntk.io import ReaderConfig, ImageDeserializer
 
 from examples.CifarResNet.CifarResNet import cifar_resnet
