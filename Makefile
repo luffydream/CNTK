@@ -1016,7 +1016,7 @@ python: $(ALL_LIBS)
             do \
                 test -x $${py_paths[$$ver]}; \
                 $${py_paths[$$ver]} setup.py \
-                    build \
+                    build_ext \
                     bdist_wheel \
                         --dist-dir $$PYTHONDIR || exit $$?; \
             done'
