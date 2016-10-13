@@ -309,14 +309,31 @@ private:
         return TensorView<ElemType>(data, tensorShape);
     }
 
-    bool IsReduceableDotProduct(const FrameRange& fr)
+    bool IsReduceableDotProduct(const FrameRange& fr, bool gradient)
     {
-        //Note that m_transpose applies to left operand only.
-        const TensorShape& shape0 = InputRef(0).GetSampleLayout();
-        const TensorShape& shape1 = InputRef(1).GetSampleLayout();
-        bool input0_ok = (shape0.GetRank() == 1);
-        bool input1_ok = (shape1.GetRank() == 1);
-        return input0_ok && input1_ok;
+        // Check if TimesNodeBase could be simplified to ElementTimes to avoid unroll
+
+        const auto& shape0   = InputRef(0).GetSampleLayout();
+        const auto& shape1   = InputRef(1).GetSampleLayout();
+        const auto& shapeOut =             GetSampleLayout();
+
+        const auto& matrix0 = gradient ? InputRef(0).Value() : InputRef(0).Gradient();
+        const auto& matrix1 = gradient ? InputRef(1).Value() : InputRef(1).Gradient();
+
+        bool input0_ok =
+            ((shape0.GetRank() == 1 && m_transpose) ||
+             (shape0.GetRank() == 2 && shape0.GetDim(0) == 1)) &&
+            (matrix0.GetMatrixType() == DENSE); // TODO: add support in ElementTimes for sparse and remove this limitation
+
+        bool input1_ok =
+            (shape1.GetRank() == 1) &&
+            (matrix1.GetMatrixType() == DENSE);
+
+        bool outputScalar =
+            (shapeOut.GetRank() == 1) &&
+            (shapeOut.GetDim(0) == 1);
+
+        return input0_ok && input1_ok && outputScalar;
     }
 
 public:
@@ -326,7 +343,7 @@ public:
         // This will be inefficient. We hope this will be the baseline of a future, more efficient TensorView-based implementation.
         if (!fr.IsOneColumnWrt(InputRef(0).GetMBLayout()))
         {
-            if (IsReduceableDotProduct(fr))
+            if (IsReduceableDotProduct(fr, false))
             {
                 ElementTimesForwardProp<false>(*this, fr);
                 return;
@@ -355,7 +372,7 @@ public:
         // special treatment if A is minibatch data; see Forward() for comment
         if (!fr.IsOneColumnWrt(InputRef(0).GetMBLayout()))
         {
-            if (IsReduceableDotProduct(fr))
+            if (IsReduceableDotProduct(fr, true))
             {
                 ElementTimesBackpropTo<false>(*this, inputIndex, fr);
                 return;
