@@ -10,7 +10,7 @@ using namespace CNTK;
 
 using namespace std::placeholders;
 
-void TrainLSTMSequenceClassifer(const DeviceDescriptor& device, bool sparseLabel, bool testSaveAndReLoad)
+void TrainLSTMSequenceClassifer(const DeviceDescriptor& device, bool testSaveAndReLoad)
 {
     const size_t inputDim = 2000;
     const size_t cellDim = 25;
@@ -21,7 +21,7 @@ void TrainLSTMSequenceClassifer(const DeviceDescriptor& device, bool sparseLabel
     auto features = InputVariable({ inputDim }, true /*isSparse*/, DataType::Float, L"features");
     auto classifierOutput = LSTMSequenceClassiferNet(features, numOutputClasses, embeddingDim, hiddenDim, cellDim, device, L"classifierOutput");
 
-    auto labels = InputVariable({ numOutputClasses }, sparseLabel /*isSparse*/, DataType::Float, L"labels", { Axis::DefaultBatchAxis() });
+    auto labels = InputVariable({ numOutputClasses }, DataType::Float, L"labels", { Axis::DefaultBatchAxis() });
     auto trainingLoss = CNTK::CrossEntropyWithSoftmax(classifierOutput, labels, L"lossFunction");
     auto prediction = CNTK::ClassificationError(classifierOutput, labels, L"classificationError");
 
@@ -164,9 +164,7 @@ void TrainLSTMSequenceClassifer()
 
     if (IsGPUAvailable())
     {
-        TrainLSTMSequenceClassifer(DeviceDescriptor::GPUDevice(0), false, true);
-        TrainLSTMSequenceClassifer(DeviceDescriptor::GPUDevice(0), true, true);
+        TrainLSTMSequenceClassifer(DeviceDescriptor::GPUDevice(0), true);
     }
-    TrainLSTMSequenceClassifer(DeviceDescriptor::CPUDevice(), false, false);
-    TrainLSTMSequenceClassifer(DeviceDescriptor::CPUDevice(), true, false);
+    TrainLSTMSequenceClassifer(DeviceDescriptor::CPUDevice(), false);
 }
