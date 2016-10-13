@@ -173,9 +173,40 @@ template class MinusNode<double>;
 // as well as mutliplying with a diagonal matrix (if represented as a column vector).
 // -----------------------------------------------------------------------
 
+// make ElementTimesNode::ForwardProp/BackpropTo template so code could be reused in TimesNodeBase
+template <bool allowBroadcast, class classType>
+void ElementTimesForwardProp(classType& c, const FrameRange& fr)
+{
+    size_t rank = c.DetermineElementwiseTensorRank();
+    auto result =             c.ValueTensorFor(rank, fr);
+    auto input0 = c.InputRef(0).ValueTensorFor(rank, allowBroadcast ? fr.AllowBroadcast() : fr);
+    auto input1 = c.InputRef(1).ValueTensorFor(rank, allowBroadcast ? fr.AllowBroadcast() : fr);
+    result.AssignElementwiseProductOf(input0, input1);
+}
+
+template <bool allowBroadcast, class classType>
+void ElementTimesBackpropTo(classType& c, const size_t inputIndex, const FrameRange& fr)
+{
+    size_t rank = c.DetermineElementwiseTensorRank();
+    auto gradient        =                        c.GradientTensorFor(rank, fr);
+    auto inputGradient   =     c.Input(inputIndex)->GradientTensorFor(rank, allowBroadcast ? fr.AllowBroadcast() : fr);
+    auto otherInputValue = c.Input(1 - inputIndex)->ValueTensorFor(rank, allowBroadcast ? fr.AllowBroadcast() : fr);
+
+    // if reduction then mask the respective input(s) (zero out the gaps)
+    if (c.Input(inputIndex)->ReducesInTimeWrt(c.shared_from_this()))
+        c.MaskMissingGradientColumnsToZero(fr);
+    if (c.Input(inputIndex)->ReducesInTimeWrt(c.Input(1 - inputIndex)))
+        c.Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
+
+    inputGradient.AddElementwiseProductOf(gradient, otherInputValue);
+}
+
 template <class ElemType>
 class ElementTimesNode : public BinaryElementWiseNode<ElemType>
 {
+    friend void ElementTimesForwardProp<true>(ElementTimesNode& c, const FrameRange& fr);
+    friend void ElementTimesBackpropTo< true>(ElementTimesNode& c, const size_t inputIndex, const FrameRange& fr);
+
     typedef BinaryElementWiseNode<ElemType> Base;
     UsingBinaryElementwiseNodeBaseMembers;
     static const std::wstring TypeName()
@@ -192,27 +223,12 @@ public:
 
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
-        size_t rank = DetermineElementwiseTensorRank();
-        auto result =             ValueTensorFor(rank, fr);
-        auto input0 = InputRef(0).ValueTensorFor(rank, fr.AllowBroadcast());
-        auto input1 = InputRef(1).ValueTensorFor(rank, fr.AllowBroadcast());
-        result.AssignElementwiseProductOf(input0, input1);
+        ElementTimesForwardProp<true>(*this, fr);
     }
 
     virtual void /*ComputationNode::*/ BackpropTo(const size_t inputIndex, const FrameRange& fr) override
     {
-        size_t rank = DetermineElementwiseTensorRank();
-        auto gradient        =                     GradientTensorFor(rank, fr);
-        auto inputGradient   =     Input(inputIndex)->GradientTensorFor(rank, fr.AllowBroadcast());
-        auto otherInputValue = Input(1 - inputIndex)->ValueTensorFor(rank, fr.AllowBroadcast());
-
-        // if reduction then mask the respective input(s) (zero out the gaps)
-        if (Input(inputIndex)->ReducesInTimeWrt(shared_from_this()))
-            MaskMissingGradientColumnsToZero(fr);
-        if (Input(inputIndex)->ReducesInTimeWrt(Input(1 - inputIndex)))
-            Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
-
-        inputGradient.AddElementwiseProductOf(gradient, otherInputValue);
+        ElementTimesBackpropTo<true>(*this, inputIndex, fr);
     }
 
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return true; }
@@ -235,6 +251,9 @@ template class ElementTimesNode<double>;
 template <class ElemType, bool m_transpose>
 class TimesNodeBase : public ComputationNode<ElemType>, public NumInputs<2>
 {
+    friend void ElementTimesForwardProp<false>(TimesNodeBase& c, const FrameRange& fr);
+    friend void ElementTimesBackpropTo< false>(TimesNodeBase& c, const size_t inputIndex, const FrameRange& fr);
+
     typedef ComputationNode<ElemType> Base; UsingComputationNodeMembers; using Base::OperationName;                                                                                                                           \
 
 public:
@@ -290,6 +309,16 @@ private:
         return TensorView<ElemType>(data, tensorShape);
     }
 
+    bool IsReduceableDotProduct(const FrameRange& fr)
+    {
+        //Note that m_transpose applies to left operand only.
+        const TensorShape& shape0 = InputRef(0).GetSampleLayout();
+        const TensorShape& shape1 = InputRef(1).GetSampleLayout();
+        bool input0_ok = (shape0.GetRank() == 1);
+        bool input1_ok = (shape1.GetRank() == 1);
+        return input0_ok && input1_ok;
+    }
+
 public:
     virtual void /*ComputationNode::*/ ForwardProp(const FrameRange& fr) override
     {
@@ -297,6 +326,12 @@ public:
         // This will be inefficient. We hope this will be the baseline of a future, more efficient TensorView-based implementation.
         if (!fr.IsOneColumnWrt(InputRef(0).GetMBLayout()))
         {
+            if (IsReduceableDotProduct(fr))
+            {
+                ElementTimesForwardProp<false>(*this, fr);
+                return;
+            }
+
             // recursively call ourselves for each individual time and sequence
             auto timeRange     = fr.GetTimeRange();
             auto sequenceRange = fr.GetSequenceRange();
@@ -320,6 +355,12 @@ public:
         // special treatment if A is minibatch data; see Forward() for comment
         if (!fr.IsOneColumnWrt(InputRef(0).GetMBLayout()))
         {
+            if (IsReduceableDotProduct(fr))
+            {
+                ElementTimesBackpropTo<false>(*this, inputIndex, fr);
+                return;
+            }
+
             auto timeRange     = fr.GetTimeRange();
             auto sequenceRange = fr.GetSequenceRange();
             for (auto t = timeRange.first; t < timeRange.second; t++) // step left to right to allow to build a sparse matrix
