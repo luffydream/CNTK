@@ -320,7 +320,7 @@ private:
         bool input0_ok =
             ((shape0.GetRank() == 1 && m_transpose) ||
              (shape0.GetRank() == 2 && shape0.GetDim(0) == 1)) &&
-             (InputRef(0).Value().GetMatrixType() == DENSE); // TODO: add support in ElementTimes for sparse and remove this limitation
+            (InputRef(0).Value().GetMatrixType() == DENSE); // TODO: add support in ElementTimes for sparse and remove this limitation
 
         bool input1_ok =
             (shape1.GetRank() == 1) &&
